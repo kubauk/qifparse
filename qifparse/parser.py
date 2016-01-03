@@ -12,6 +12,9 @@ from qifparse.qif import (
     Class,
     Qif,
 )
+import re
+
+DEFAULT_DATE_FORMAT = 'dmy'
 
 NON_INVST_ACCOUNT_TYPES = [
     '!Type:Cash',
@@ -27,6 +30,10 @@ class QifParserException(Exception):
     pass
 
 
+class QifParserInvalidDate(QifParserException):
+    pass
+
+
 class QifParser(object):
 
     @classmethod
@@ -37,6 +44,8 @@ class QifParser(object):
         data = file_handle.read()
         if len(data) == 0:
             raise QifParserException('Data is empty')
+        if not date_format:
+            date_format = cls_.guessDateFormat(cls_.getDateSamples(data))
         qif_obj = Qif()
         chunks = data.split('\n^\n')
         last_type = None
@@ -73,7 +82,7 @@ class QifParser(object):
                 raise QifParserException('Header not reconized')
             # if no header is recognized then
             # we use the previous one
-            item = parsers[last_type](chunk)
+            item = parsers[last_type](chunk, date_format)
             if last_type == 'account':
                 qif_obj.add_account(item)
                 last_account = item
@@ -92,7 +101,7 @@ class QifParser(object):
         return qif_obj
 
     @classmethod
-    def parseClass(cls_, chunk):
+    def parseClass(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
         curItem = Class()
@@ -108,7 +117,7 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseCategory(cls_, chunk):
+    def parseCategory(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
         curItem = Category()
@@ -134,7 +143,7 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseAccount(cls_, chunk):
+    def parseAccount(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
         curItem = Account()
@@ -151,7 +160,7 @@ class QifParser(object):
             elif line[0] == 'L':
                 curItem.credit_limit = line[1:]
             elif line[0] == '/':
-                curItem.balance_date = cls_.parseQifDateTime(line[1:])
+                curItem.balance_date = cls_.parseQifDateTime(line[1:], date_format)
             elif line[0] == '$':
                 curItem.balance_amount = line[1:]
             else:
@@ -159,13 +168,11 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseMemorizedTransaction(cls_, chunk, date_format=None):
+    def parseMemorizedTransaction(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
 
         curItem = MemorizedTransaction()
-        if date_format:
-            curItem.date_format = date_format
         lines = chunk.split('\n')
         for line in lines:
             if not len(line) or line[0] == '\n' or \
@@ -216,19 +223,18 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseTransaction(cls_, chunk, date_format=None):
+    def parseTransaction(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
 
         curItem = Transaction()
-        if date_format:
-            curItem.date_format = date_format
+
         lines = chunk.split('\n')
         for line in lines:
             if not len(line) or line[0] == '\n' or line.startswith('!Type'):
                 continue
             elif line[0] == 'D':
-                curItem.date = cls_.parseQifDateTime(line[1:])
+                curItem.date = cls_.parseQifDateTime(line[1:], date_format)
             elif line[0] == 'N':
                 curItem.num = line[1:]
             elif line[0] == 'T':
@@ -288,19 +294,18 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseInvestment(cls_, chunk, date_format=None):
+    def parseInvestment(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
         """
         """
 
         curItem = Investment()
-        if date_format:
-            curItem.date_format = date_format
+
         lines = chunk.split('\n')
         for line in lines:
             if not len(line) or line[0] == '\n' or line.startswith('!Type'):
                 continue
             elif line[0] == 'D':
-                curItem.date = cls_.parseQifDateTime(line[1:])
+                curItem.date = cls_.parseQifDateTime(line[1:], date_format)
             elif line[0] == 'T':
                 curItem.amount = Decimal(line[1:])
             elif line[0] == 'N':
@@ -324,30 +329,61 @@ class QifParser(object):
             elif line[0] == 'O':
                 curItem.commission = Decimal(line[1:])
         return curItem
+    @classmethod
+    def getDateSamples(cls, data):
+        for line in data.split('\n'):
+            if line.startswith('D'):
+                yield line[1:]
 
     @classmethod
-    def parseQifDateTime(cls_, qdate):
-        """ convert from QIF time format to ISO date string
+    def guessDateFormat(cls, samples):
+        possible_date_formats = ['dmy', 'mdy', 'ymd']
+        for sample in samples:
+            for date_format in possible_date_formats:
+                try:
+                    cls.parseQifDateTime(sample, date_format=date_format)
+                except QifParserInvalidDate:
+                    possible_date_formats.remove(date_format)
+        if len(possible_date_formats) == 0:
+            raise QifParserInvalidDate("Inconsistent or invalid date values")
+        elif len(possible_date_formats) > 1:
+            raise QifParserInvalidDate("It is not possible to guess the date format: please specify")
+        return possible_date_formats[0]
 
-        QIF is like "7/ 9/98"  "9/ 7/99" or "10/10/99" or "10/10'01" for y2k
-             or, it seems (citibankdownload 20002) like "01/22/2002"
-             or, (Paypal 2011) like "3/2/2011".
-        ISO is like   YYYY-MM-DD  I think @@check
+    @classmethod
+    def parseQifDateTime(cls_, qdate, date_format='dmy'):
         """
-        if qdate[1] == "/":
-            qdate = "0" + qdate   # Extend month to 2 digits
-        if qdate[4] == "/":
-            qdate = qdate[:3]+"0" + qdate[3:]   # Extend month to 2 digits
-        for i in range(len(qdate)):
-            if qdate[i] == " ":
-                qdate = qdate[:i] + "0" + qdate[i+1:]
-
-        if len(qdate) == 10:  # new form with YYYY date
-            iso_date = qdate[6:10] + "-" + qdate[0:2] + "-" + qdate[3:5]
-            return datetime.strptime(iso_date, '%Y-%m-%d')
-        if qdate[5] == "'":
-            C = "20"
+        Try to detect date format and parse it to datetime object
+        :param qdate: date string
+        :return: parsed datetime object
+        """
+        # manage y2k (e.g. 1/1'3 -> 1/1/2003)
+        if qdate[-2] == "'":
+            #e.g. 1/1'3
+            norm_qdate = qdate.replace("'", "/200")
+        elif qdate[-3] == "'":
+            # e.g. 1/1'12
+            norm_qdate = qdate.replace("'", "/20")
         else:
-            C = "19"
-        iso_date = C + qdate[6:8] + "-" + qdate[0:2] + "-" + qdate[3:5]
-        return datetime.strptime(iso_date, '%Y-%m-%d')
+            # e.g. 1/1'2012
+            norm_qdate = qdate.replace("'", "/")
+
+        norm_qdate = norm_qdate.strip()
+
+        try:
+            (n1, n2, n3) = re.split(r'\W+', norm_qdate)
+        except ValueError as err:
+            raise QifParserInvalidDate("Invalid date: %s (normalized to %s): %s" % (qdate, norm_qdate, err))
+
+        try:
+            if date_format == 'dmy':
+                return datetime(int(n3), int(n2), int(n1))
+            elif date_format == 'mdy':
+                return datetime(int(n3), int(n1), int(n2))
+            elif date_format == 'ymd':
+                return datetime(int(n1), int(n2), int(n3))
+            else:
+                raise QifParserInvalidDate("unsupported date_format: %s" % date_format)
+        except ValueError as err:
+            raise QifParserInvalidDate("Invalid date: %s (splitted to (%s, %s ,%s), %s): %s" %
+                                       (qdate, n1, n2, n3, date_format, err))
