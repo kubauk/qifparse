@@ -79,7 +79,7 @@ class QifParser(object):
                 last_type = 'memorized'
                 transactions_header = first_line
             elif chunk.startswith('!'):
-                raise QifParserException('Header not reconized')
+                raise QifParserException('Header not recognized: %s' % chunk)
             # if no header is recognized then
             # we use the previous one
             item = parsers[last_type](chunk, date_format)
@@ -331,8 +331,13 @@ class QifParser(object):
         return curItem
     @classmethod
     def getDateSamples(cls, data):
+        skip = False
         for line in data.split('\n'):
-            if line.startswith('D'):
+            if line.startswith('!'):
+                skip = False
+            if line.startswith('!Account'):
+                skip = True
+            if line.startswith('D') and not skip:
                 yield line[1:]
 
     @classmethod
