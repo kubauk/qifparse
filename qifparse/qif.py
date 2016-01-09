@@ -101,8 +101,8 @@ class Qif(object):
             tr = []
             tr.extend(self._transactions.values())
             for acc in self._accounts:
-                tr.extend(acc.transactions)
-
+                tr.extend(acc._transactions.values())
+            return tuple(tr)
     def __str__(self):
         res = []
         if self._categories:
@@ -307,7 +307,7 @@ class Account(BaseEntry):
     account_type = property(get_type, set_type)
 
     def get_transactions(self):
-        return tuple(self._transactions)
+        return tuple(self._transactions.values())
 
     def __str__(self):
         res = []

@@ -5,10 +5,12 @@ import os
 import datetime
 
 from qifparse.parser import QifParser, QifParserInvalidDate
+from qifparse.qif import Qif, Account, Transaction, AmountSplit
 
 
 def build_data_path(fn):
     return os.path.join(os.path.dirname(__file__), 'data', fn)
+
 filename = build_data_path('file.qif')
 filename2 = build_data_path('transactions_only.qif')
 
@@ -18,6 +20,45 @@ class TestQIFParsing(unittest.TestCase):
     def testParseFile(self):
         qif = QifParser.parse(open(filename), date_format='dmy')
         self.assertTrue(qif)
+        self.assertIsInstance(qif, Qif)
+        self.assertEqual(len(qif.get_accounts()), 2)
+        cash_account = qif.get_accounts('My Cash')[0]
+        self.assertIsInstance(cash_account, Account)
+        self.assertEqual(cash_account.name, 'My Cash')
+        self.assertEqual(cash_account.account_type, 'Cash')
+        cc_account = qif.get_accounts('My Cc')[0]
+        self.assertIsInstance(cc_account, Account)
+        self.assertEqual(cc_account.name, 'My Cc')
+        self.assertEqual(cc_account.account_type, 'Invst')
+        cash_transactions = cash_account.get_transactions()
+        self.assertEqual(len(cash_transactions), 1)
+        self.assertEqual(len(cash_transactions[0]), 3)
+        transaction = cash_transactions[0][0]
+        self.assertIsInstance(transaction, Transaction)
+        self.assertEqual(transaction.date, datetime.datetime(2013, 10, 23))
+        self.assertEqual(transaction.amount, -6.50)
+        self.assertEqual(transaction.category, 'food:lunch')
+        transaction = cash_transactions[0][1]
+        self.assertEqual(transaction.to_account, 'My Cc')
+        transaction = cash_transactions[0][2]
+        self.assertEqual(transaction.date, datetime.datetime(2013, 10, 11))
+        self.assertEqual(transaction.address, ['via Roma', '44100, Ferrara', 'Italy'])
+        self.assertEqual(len(transaction.splits), 2)
+        split = transaction.splits[0]
+        self.assertIsInstance(split, AmountSplit)
+        self.assertEqual(split.amount, -31.00)
+        self.assertEqual(split.to_account, 'My Cc')
+        split = transaction.splits[1]
+        self.assertEqual(split.category, 'food:lunch')
+
+        cc_transactions = cc_account.get_transactions()
+        self.assertEqual(len(cc_transactions), 2)
+
+        all_transactions = qif.get_transactions(recursive=True)
+        self.assertEqual(len(all_transactions), 3)
+
+        noaccount_transactions = qif.get_transactions()
+        self.assertEqual(len(noaccount_transactions), 0)
 
     def testParseDateFormat(self):
         for file_number in range(1,9):
