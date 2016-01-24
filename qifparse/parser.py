@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+import locale
+
 import six
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from qifparse.qif import (
     Transaction,
     MemorizedTransaction,
@@ -15,6 +17,8 @@ from qifparse.qif import (
 import re
 
 DEFAULT_DATE_FORMAT = 'dmy'
+DEFAULT_DECIMAL_SEP = '.'
+DEFAULT_THOUSANDS_SEP = ''
 
 NON_INVST_ACCOUNT_TYPES = [
     '!Type:Cash',
@@ -35,10 +39,14 @@ class QifParserInvalidDate(QifParserException):
     pass
 
 
+class QifParserInvalidNumber(QifParserException):
+    pass
+
+
 class QifParser(object):
 
     @classmethod
-    def parse(cls_, file_handle, date_format=None):
+    def parse(cls_, file_handle, date_format=None, num_sep=None):
         if isinstance(file_handle, type('')):
             raise RuntimeError(
                 six.u("parse() takes in a file handle, not a string"))
@@ -47,6 +55,10 @@ class QifParser(object):
             raise QifParserException('Data is empty')
         if not date_format:
             date_format = cls_.guessDateFormat(cls_.getDateSamples(data))
+        if num_sep is None:
+            decimal_sep, thousands_sep = cls_.guessNumberFormat(cls_.getNumberSamples(data))
+        else:
+            decimal_sep, thousands_sep = num_sep
         qif_obj = Qif()
         chunks = data.split('\n^\n')
         last_type = None
@@ -83,7 +95,7 @@ class QifParser(object):
                 raise QifParserException('Header not recognized: %s' % chunk)
             # if no header is recognized then
             # we use the previous one
-            item = parsers[last_type](chunk, date_format)
+            item = parsers[last_type](chunk, date_format, decimal_sep, thousands_sep)
             if last_type == 'account':
                 qif_obj.add_account(item)
                 last_account = item
@@ -102,9 +114,10 @@ class QifParser(object):
         return qif_obj
 
     @classmethod
-    def parseClass(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
-        """
-        """
+    def parseClass(cls_, chunk,
+                   date_format=DEFAULT_DATE_FORMAT,
+                   decimal_sep=DEFAULT_DECIMAL_SEP,
+                   thousands_sep=DEFAULT_THOUSANDS_SEP):
         curItem = Class()
         lines = chunk.split('\n')
         for line in lines:
@@ -118,7 +131,10 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseCategory(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
+    def parseCategory(cls_, chunk,
+                      date_format=DEFAULT_DATE_FORMAT,
+                      decimal_sep=DEFAULT_DECIMAL_SEP,
+                      thousands_sep=DEFAULT_THOUSANDS_SEP):
         """
         """
         curItem = Category()
@@ -144,7 +160,10 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseAccount(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
+    def parseAccount(cls_, chunk,
+                     date_format=DEFAULT_DATE_FORMAT,
+                     decimal_sep=DEFAULT_DECIMAL_SEP,
+                     thousands_sep=DEFAULT_THOUSANDS_SEP):
         """
         """
         curItem = Account()
@@ -169,7 +188,10 @@ class QifParser(object):
         return curItem
 
     @classmethod
-    def parseMemorizedTransaction(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
+    def parseMemorizedTransaction(cls_, chunk,
+                                  date_format=DEFAULT_DATE_FORMAT,
+                                  decimal_sep=DEFAULT_DECIMAL_SEP,
+                                  thousands_sep=DEFAULT_THOUSANDS_SEP):
         """
         """
 
@@ -180,7 +202,7 @@ class QifParser(object):
                     line.startswith('!Type:Memorized'):
                 continue
             elif line[0] == 'T':
-                curItem.amount = Decimal(line[1:])
+                curItem.amount = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'C':
                 curItem.cleared = line[1:]
             elif line[0] == 'P':
@@ -217,14 +239,17 @@ class QifParser(object):
                 split.address.append(line[1:])
             elif line[0] == '$':
                 split = curItem.splits[-1]
-                split.amount = Decimal(line[1:-1])
+                split.amount = cls_.parseQifNumber(line[1:-1], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             else:
                 # don't recognise this line; ignore it
                 print ("Skipping unknown line:\n" + str(line))
         return curItem
 
     @classmethod
-    def parseTransaction(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
+    def parseTransaction(cls_, chunk,
+                         date_format=DEFAULT_DATE_FORMAT,
+                         decimal_sep=DEFAULT_DECIMAL_SEP,
+                         thousands_sep=DEFAULT_THOUSANDS_SEP):
         """
         """
 
@@ -239,7 +264,7 @@ class QifParser(object):
             elif line[0] == 'N':
                 curItem.num = line[1:]
             elif line[0] == 'T':
-                curItem.amount = Decimal(line[1:])
+                curItem.amount = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'C':
                 curItem.cleared = line[1:]
             elif line[0] == 'P':
@@ -288,14 +313,17 @@ class QifParser(object):
                 split.address.append(line[1:])
             elif line[0] == '$':
                 split = curItem.splits[-1]
-                split.amount = Decimal(line[1:-1])
+                split.amount = cls_.parseQifNumber(line[1:-1], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             else:
                 # don't recognise this line; ignore it
                 print ("Skipping unknown line:\n" + str(line))
         return curItem
 
     @classmethod
-    def parseInvestment(cls_, chunk, date_format=DEFAULT_DATE_FORMAT):
+    def parseInvestment(cls_, chunk,
+                        date_format=DEFAULT_DATE_FORMAT,
+                        decimal_sep=DEFAULT_DECIMAL_SEP,
+                        thousands_sep=DEFAULT_THOUSANDS_SEP):
         """
         """
 
@@ -308,15 +336,15 @@ class QifParser(object):
             elif line[0] == 'D':
                 curItem.date = cls_.parseQifDateTime(line[1:], date_format)
             elif line[0] == 'T':
-                curItem.amount = Decimal(line[1:])
+                curItem.amount = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'N':
                 curItem.action = line[1:]
             elif line[0] == 'Y':
                 curItem.security = line[1:]
             elif line[0] == 'I':
-                curItem.price = Decimal(line[1:])
+                curItem.price = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'Q':
-                curItem.quantity = Decimal(line[1:])
+                curItem.quantity = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'C':
                 curItem.cleared = line[1:]
             elif line[0] == 'M':
@@ -326,26 +354,31 @@ class QifParser(object):
             elif line[0] == 'L':
                 curItem.to_account = line[2:-1]
             elif line[0] == '$':
-                curItem.amount_transfer = Decimal(line[1:])
+                curItem.amount_transfer = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             elif line[0] == 'O':
-                curItem.commission = Decimal(line[1:])
+                curItem.commission = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
         return curItem
+
     @classmethod
-    def getDateSamples(cls, data):
+    def getSamples(cls, data, data_type):
         skip = False
         for line in data.split('\n'):
             if line.startswith('!'):
                 skip = False
             if line.startswith('!Account'):
                 skip = True
-            if line.startswith('D') and not skip:
+            if line.startswith(data_type) and not skip:
                 yield line[1:]
+
+    @classmethod
+    def getDateSamples(cls, data):
+        return cls.getSamples(data, 'D')
 
     @classmethod
     def guessDateFormat(cls, samples):
         possible_date_formats = ['dmy', 'mdy', 'ymd']
         for sample in samples:
-            for date_format in possible_date_formats:
+            for date_format in possible_date_formats[:]:
                 try:
                     cls.parseQifDateTime(sample, date_format=date_format)
                 except QifParserInvalidDate:
@@ -393,3 +426,69 @@ class QifParser(object):
         except ValueError as err:
             raise QifParserInvalidDate("Invalid date: %s (splitted to (%s, %s ,%s), %s): %s" %
                                        (qdate, n1, n2, n3, date_format, err))
+
+    @classmethod
+    def getNumberSamples(cls, data):
+        return cls.getSamples(data, 'T')
+
+    @classmethod
+    def guessNumberFormat(cls, samples):
+        possible_num_sep = [('.', ''), ('.', ','), (',', ''), (',', '.')]
+
+        for sample in samples:
+            for decimal_sep, thousands_sep in possible_num_sep[:]:
+                try:
+                    cls.parseQifNumber(sample, decimal_sep=decimal_sep, thousands_sep=thousands_sep)
+                except (QifParserInvalidNumber, InvalidOperation):
+                    possible_num_sep.remove((decimal_sep, thousands_sep))
+        if len(possible_num_sep) == 0:
+            raise QifParserInvalidNumber("Inconsistent or invalid number values")
+        elif len(possible_num_sep) > 1:
+            possible_decimal_seps = set([x[0] for x in possible_num_sep])
+            if len(possible_decimal_seps) == 1:
+                # There's only one possibility for decimal separator
+                possible_thousands_seps = set([x[1] for x in possible_num_sep if x[1] != ''])
+                if len(possible_thousands_seps) == 1:
+                    # there is only one non empty alternative for thousands separator
+                    return iter(possible_decimal_seps).next(), iter(possible_thousands_seps).next()
+            raise QifParserInvalidNumber("""It is not possible to guess the number format:\
+please specify. (possible formats: %s""" % repr(possible_num_sep))
+        return possible_num_sep[0]
+
+    @classmethod
+    def parseQifNumber(cls, qnumber,
+                       decimal_sep=DEFAULT_DECIMAL_SEP,
+                       thousands_sep=DEFAULT_THOUSANDS_SEP):
+
+        """
+
+        :type qnumber: str
+        """
+        if decimal_sep == thousands_sep:
+            raise QifParserException(
+                    "Cannot parse number if decimal_sep is the same as thousands_sep (%s)" % decimal_sep)
+
+        if qnumber.find(decimal_sep) != -1:
+            try:
+                int_p, frac_p = qnumber.split(decimal_sep)
+            except ValueError:
+                raise QifParserInvalidNumber("Something wrong with decimal separator '%s' in %s" % (decimal_sep, qnumber))
+        else:
+            int_p = qnumber
+            frac_p = '0'
+
+        if thousands_sep:
+            thousands = int_p.split(thousands_sep)
+            if len(thousands[0]) > 3:
+                raise QifParserInvalidNumber("Something wrong with thousands separator '%s' in %s" % (thousands_sep, qnumber))
+            for block in thousands[1:]:
+                if len(block) != 3:
+                    raise QifParserInvalidNumber("Something wrong with thousands separator '%s' in %s" % (thousands_sep, qnumber))
+            int_p = int_p.replace(thousands_sep, '')
+        else:
+            try:
+                int_p = int(int_p)
+            except ValueError as err:
+                raise QifParserInvalidNumber("Invalid integer part: %s: %s" % (int_p, err))
+
+        return Decimal("%s.%s" % (int_p, frac_p))

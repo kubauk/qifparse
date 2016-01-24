@@ -4,7 +4,9 @@ import os
 
 import datetime
 
-from qifparse.parser import QifParser, QifParserInvalidDate
+from decimal import Decimal
+
+from qifparse.parser import QifParser, QifParserInvalidDate, QifParserInvalidNumber, QifParserException
 from qifparse.qif import Qif, Account, Transaction, AmountSplit
 
 
@@ -63,17 +65,27 @@ class TestQIFParsing(unittest.TestCase):
     def testParseDateFormat(self):
         for file_number in range(1,9):
             with open(build_data_path('date_format_{0:02d}.qif'.format(file_number))) as fh:
-                qif = QifParser.parse(fh)
+                qif = QifParser.parse(fh, num_sep=('.', ''))
                 transaction = qif.get_transactions()[0][0]
                 self.assertEqual(transaction.date, datetime.datetime(2016, 1, 2))
 
     def testParseDateFormatInconsistentDates(self):
         with open(build_data_path('date_format_error_01.qif')) as fh:
-            self.assertRaises(QifParserInvalidDate, QifParser.parse, fh)
+            self.assertRaises(QifParserInvalidDate, QifParser.parse, fh, num_sep=('.', ''))
 
     def testParseDateFormatUnguessableDateFormat(self):
         with open(build_data_path('date_format_error_02.qif')) as fh:
-            self.assertRaises(QifParserInvalidDate, QifParser.parse, fh)
+            self.assertRaises(QifParserInvalidDate, QifParser.parse, fh, num_sep=('.', ''))
+
+    def testParseNumberFormat(self):
+        for file_number in range(1,4):
+            with open(build_data_path('number_format_{0:02d}.qif'.format(file_number))) as fh:
+                try:
+                    qif = QifParser.parse(fh, date_format='dmy')
+                except QifParserInvalidNumber, err:
+                    raise QifParserInvalidNumber("%s in file %s" % (err, fh.name))
+                transaction = qif.get_transactions()[0][0]
+                self.assertEqual(transaction.amount, Decimal('-1234.56'))
 
     def testWriteFile(self):
         data = open(filename).read()
@@ -90,6 +102,20 @@ class TestQIFParsing(unittest.TestCase):
 #        out.write(str(qif))
 #        out.close()
         self.assertEquals(data, str(qif))
+
+    def testParseQifNumber(self):
+        self.assertEqual(QifParser.parseQifNumber('1'), Decimal('1'))
+        self.assertEqual(QifParser.parseQifNumber('1.2'), Decimal('1.2'))
+        self.assertEqual(QifParser.parseQifNumber('1,2', decimal_sep=','), Decimal('1.2'))
+        self.assertEqual(QifParser.parseQifNumber('1.234', decimal_sep='.'), Decimal('1.234'))
+        self.assertEqual(QifParser.parseQifNumber('1.234', thousands_sep='.', decimal_sep=','), Decimal('1234'))
+        self.assertEqual(QifParser.parseQifNumber('1,234', thousands_sep=','), Decimal('1234'))
+        self.assertEqual(QifParser.parseQifNumber('1234', decimal_sep='.'), Decimal('1234'))
+        self.assertEqual(QifParser.parseQifNumber('-1234.56', decimal_sep='.'), Decimal('-1234.56'))
+        self.assertRaises(QifParserException, QifParser.parseQifNumber, '-1234.56', decimal_sep=',')
+
+
+
 
 if __name__ == "__main__":
     import unittest
