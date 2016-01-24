@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import six
+import logging
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from qifparse.qif import (
@@ -13,6 +14,8 @@ from qifparse.qif import (
     Qif,
 )
 import re
+
+logger = logging.getLogger("qifparse")
 
 DEFAULT_DATE_FORMAT = 'dmy'
 DEFAULT_DECIMAL_SEP = '.'
@@ -182,7 +185,7 @@ class QifParser(object):
             elif line[0] == '$':
                 curItem.balance_amount = line[1:]
             else:
-                print('Line not recognized: ' + line)
+                logger.warn('Line not recognized: %s' % line)
         return curItem
 
     @classmethod
@@ -240,7 +243,7 @@ class QifParser(object):
                 split.amount = cls_.parseQifNumber(line[1:-1], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             else:
                 # don't recognise this line; ignore it
-                print ("Skipping unknown line:\n" + str(line))
+                logger.warn("Skipping unknown line:\n" + str(line))
         return curItem
 
     @classmethod
@@ -314,7 +317,7 @@ class QifParser(object):
                 split.amount = cls_.parseQifNumber(line[1:-1], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             else:
                 # don't recognise this line; ignore it
-                print ("Skipping unknown line:\n" + str(line))
+                logger.warn("Skipping unknown line:\n" + str(line))
         return curItem
 
     @classmethod

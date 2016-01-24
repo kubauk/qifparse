@@ -103,6 +103,7 @@ class Qif(object):
             for acc in self._accounts:
                 tr.extend(acc._transactions.values())
             return tuple(tr)
+
     def __str__(self):
         res = []
         if self._categories:
