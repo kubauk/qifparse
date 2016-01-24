@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import locale
-
 import six
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
