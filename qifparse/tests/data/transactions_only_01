@@ -1,0 +1,28 @@
+!Type:Bank
+D02/06'2014
+T0,00
+CX
+POpening Balance
+L[test account]
+^
+D13/06'2014
+CX
+T990,00
+Ptest payee
+LTest category1:Test subcategory1
+STest category1:Test subcategory1
+$123,45
+STest category2:Test subcategory2
+$6,78
+^
+D09/12'2013
+CX
+T-51,73
+Ptest payee 2
+LTest category 3:Test subcategory1
+^
+D12/12'2013
+CX
+T-478,74
+L[test account 2]
+^

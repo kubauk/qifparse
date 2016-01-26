@@ -93,7 +93,7 @@ class QifParser(object):
                 last_type = 'memorized'
                 transactions_header = first_line
             elif chunk.startswith('!'):
-                raise QifParserException('Header not recognized: %s' % chunk)
+                raise QifParserException(six.u("Header not recognized: %s") % first_line)
             # if no header is recognized then
             # we use the previous one
             item = parsers[last_type](chunk, date_format, decimal_sep, thousands_sep)
@@ -440,11 +440,13 @@ class QifParser(object):
             for decimal_sep, thousands_sep in possible_num_sep[:]:
                 try:
                     cls.parseQifNumber(sample, decimal_sep=decimal_sep, thousands_sep=thousands_sep)
-                except (QifParserInvalidNumber, InvalidOperation):
+                except (QifParserInvalidNumber, InvalidOperation) as err:
+                    logger.debug("Discarding (%s %s) for %s" % (decimal_sep, thousands_sep, sample))
                     possible_num_sep.remove((decimal_sep, thousands_sep))
-        if len(possible_num_sep) == 0:
-            raise QifParserInvalidNumber("Inconsistent or invalid number values")
-        elif len(possible_num_sep) > 1:
+                    if len(possible_num_sep) == 0:
+                        raise QifParserInvalidNumber("Inconsistent or invalid number values: \
+                        '%s' doesn't fit to last remaining separators: (%s %s): %s" % (sample, decimal_sep, thousands_sep, err))
+        if len(possible_num_sep) > 1:
             possible_decimal_seps = set([x[0] for x in possible_num_sep])
             if len(possible_decimal_seps) == 1:
                 # There's only one possibility for decimal separator
@@ -479,7 +481,7 @@ please specify. (possible formats: %s""" % repr(possible_num_sep))
             frac_p = '0'
 
         if thousands_sep:
-            thousands = int_p.split(thousands_sep)
+            thousands = int_p.lstrip('-').split(thousands_sep)
             if len(thousands[0]) > 3:
                 raise QifParserInvalidNumber("Something wrong with thousands separator '%s' in %s" % (thousands_sep, qnumber))
             for block in thousands[1:]:
