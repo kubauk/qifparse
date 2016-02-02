@@ -38,7 +38,7 @@ class TestQIFParsing(unittest.TestCase):
         transaction = cash_transactions[0][0]
         self.assertTrue(isinstance(transaction, Transaction))
         self.assertEqual(transaction.date, datetime.datetime(2013, 10, 23))
-        self.assertEqual(transaction.amount, -6.50)
+        self.assertEqual(transaction.amount, Decimal("-6.50"))
         self.assertEqual(transaction.category, 'food:lunch')
         transaction = cash_transactions[0][1]
         self.assertEqual(transaction.to_account, 'My Cc')
@@ -48,7 +48,7 @@ class TestQIFParsing(unittest.TestCase):
         self.assertEqual(len(transaction.splits), 2)
         split = transaction.splits[0]
         self.assertTrue(isinstance(split, AmountSplit))
-        self.assertEqual(split.amount, -31.00)
+        self.assertEqual(split.amount, Decimal("-31.00"))
         self.assertEqual(split.to_account, 'My Cc')
         split = transaction.splits[1]
         self.assertEqual(split.category, 'food:lunch')
