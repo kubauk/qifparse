@@ -22,21 +22,21 @@ filename3 = build_data_path('transactions_only.qif')
 class TestQIFParsing(unittest.TestCase):
     def _check(self, qif):
         self.assertTrue(qif)
-        self.assertIsInstance(qif, Qif)
+        self.assertTrue(isinstance(qif, Qif))
         self.assertEqual(len(qif.get_accounts()), 2)
         cash_account = qif.get_accounts('My Cash')[0]
-        self.assertIsInstance(cash_account, Account)
+        self.assertTrue(isinstance(cash_account, Account))
         self.assertEqual(cash_account.name, 'My Cash')
         self.assertEqual(cash_account.account_type, 'Cash')
         cc_account = qif.get_accounts('My Cc')[0]
-        self.assertIsInstance(cc_account, Account)
+        self.assertTrue(isinstance(cc_account, Account))
         self.assertEqual(cc_account.name, 'My Cc')
         self.assertEqual(cc_account.account_type, 'Invst')
         cash_transactions = cash_account.get_transactions()
         self.assertEqual(len(cash_transactions), 1)
         self.assertEqual(len(cash_transactions[0]), 3)
         transaction = cash_transactions[0][0]
-        self.assertIsInstance(transaction, Transaction)
+        self.assertTrue(isinstance(transaction, Transaction))
         self.assertEqual(transaction.date, datetime.datetime(2013, 10, 23))
         self.assertEqual(transaction.amount, -6.50)
         self.assertEqual(transaction.category, 'food:lunch')
@@ -47,7 +47,7 @@ class TestQIFParsing(unittest.TestCase):
         self.assertEqual(transaction.address, ['via Roma', '44100, Ferrara', 'Italy'])
         self.assertEqual(len(transaction.splits), 2)
         split = transaction.splits[0]
-        self.assertIsInstance(split, AmountSplit)
+        self.assertTrue(isinstance(split, AmountSplit))
         self.assertEqual(split.amount, -31.00)
         self.assertEqual(split.to_account, 'My Cc')
         split = transaction.splits[1]
