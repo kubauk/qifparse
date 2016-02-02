@@ -14,13 +14,13 @@ def build_data_path(fn):
     return os.path.join(os.path.dirname(__file__), 'data', fn)
 
 filename = build_data_path('file.qif')
-filename2 = build_data_path('transactions_only.qif')
+filename2 = build_data_path('file2.qif')
+
+filename3 = build_data_path('transactions_only.qif')
 
 
 class TestQIFParsing(unittest.TestCase):
-
-    def testParseFile(self):
-        qif = QifParser.parse(open(filename), date_format='dmy')
+    def _check(self, qif):
         self.assertTrue(qif)
         self.assertIsInstance(qif, Qif)
         self.assertEqual(len(qif.get_accounts()), 2)
@@ -62,6 +62,14 @@ class TestQIFParsing(unittest.TestCase):
         noaccount_transactions = qif.get_transactions()
         self.assertEqual(len(noaccount_transactions), 0)
 
+    def testParseFile(self):
+        qif = QifParser.parse(open(filename), date_format='dmy')
+        self._check(qif)
+
+    def testParseCrLfFile(self):
+        qif = QifParser.parse(open(filename2), date_format='dmy')
+        self._check(qif)
+
     def testParseDateFormat(self):
         for file_number in range(1,9):
             with open(build_data_path('date_format_{0:02d}.qif'.format(file_number))) as fh:
@@ -96,8 +104,8 @@ class TestQIFParsing(unittest.TestCase):
         self.assertEquals(data, str(qif))
 
     def testParseTransactionsFile(self):
-        data = open(filename2).read()
-        qif = QifParser.parse(open(filename2))
+        data = open(filename3).read()
+        qif = QifParser.parse(open(filename3))
 #        out = open('out.qif', 'w')
 #        out.write(str(qif))
 #        out.close()

@@ -51,7 +51,12 @@ class QifParser(object):
         if isinstance(file_handle, type('')):
             raise RuntimeError(
                 six.u("parse() takes in a file handle, not a string"))
-        data = file_handle.read()
+        # Read file in this way to avoid problems with different newlines separators:
+        # Since it is not in our control how the file is opened we can't rely on
+        # universal newlines feature
+
+        data = '\n'.join(x.strip() for x in file_handle)
+
         if len(data) == 0:
             raise QifParserException('Data is empty')
         if not date_format:
@@ -93,7 +98,7 @@ class QifParser(object):
                 last_type = 'memorized'
                 transactions_header = first_line
             elif chunk.startswith('!'):
-                raise QifParserException(six.u("Header not recognized: %s") % first_line)
+                raise QifParserException(six.u("Header not recognized: %s") % repr(first_line))
             # if no header is recognized then
             # we use the previous one
             item = parsers[last_type](chunk, date_format, decimal_sep, thousands_sep)
@@ -306,7 +311,7 @@ class QifParser(object):
                     split.category = cat
             elif line[0] == 'E':
                 split = curItem.splits[-1]
-                split.memo = line[1:-1]
+                split.memo = line[1:]
             elif line[0] == 'A':
                 split = curItem.splits[-1]
                 if not split.address:
@@ -314,7 +319,7 @@ class QifParser(object):
                 split.address.append(line[1:])
             elif line[0] == '$':
                 split = curItem.splits[-1]
-                split.amount = cls_.parseQifNumber(line[1:-1], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
+                split.amount = cls_.parseQifNumber(line[1:], decimal_sep=decimal_sep, thousands_sep=thousands_sep)
             else:
                 # don't recognise this line; ignore it
                 logger.warn("Skipping unknown line:\n" + str(line))
