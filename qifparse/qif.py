@@ -117,7 +117,7 @@ class Qif(object):
             for cat in self._classes:
                 res.append(str(cat))
         if self._transactions:
-            for header in self._transactions.keys():
+            for header in sorted(self._transactions.keys()):
                 transactions = self._transactions[header]
                 res.append(header)
                 for tr in transactions:

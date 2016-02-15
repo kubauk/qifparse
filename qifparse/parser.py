@@ -458,7 +458,7 @@ class QifParser(object):
                 possible_thousands_seps = set([x[1] for x in possible_num_sep if x[1] != ''])
                 if len(possible_thousands_seps) == 1:
                     # there is only one non empty alternative for thousands separator
-                    return iter(possible_decimal_seps).next(), iter(possible_thousands_seps).next()
+                    return six.next(iter(possible_decimal_seps)), six.next(iter(possible_thousands_seps))
             raise QifParserInvalidNumber("""It is not possible to guess the number format:\
 please specify. (possible formats: %s""" % repr(possible_num_sep))
         return possible_num_sep[0]

@@ -20,6 +20,7 @@ filename3 = build_data_path('transactions_only.qif')
 
 
 class TestQIFParsing(unittest.TestCase):
+    maxDiff = None
     def _check(self, qif):
         self.assertTrue(qif)
         self.assertTrue(isinstance(qif, Qif))
@@ -63,11 +64,13 @@ class TestQIFParsing(unittest.TestCase):
         self.assertEqual(len(noaccount_transactions), 0)
 
     def testParseFile(self):
-        qif = QifParser.parse(open(filename), date_format='dmy')
+        with open(filename) as fh:
+            qif = QifParser.parse(fh, date_format='dmy')
         self._check(qif)
 
     def testParseCrLfFile(self):
-        qif = QifParser.parse(open(filename2), date_format='dmy')
+        with open(filename2) as fh:
+            qif = QifParser.parse(fh, date_format='dmy')
         self._check(qif)
 
     def testParseDateFormat(self):
@@ -90,26 +93,30 @@ class TestQIFParsing(unittest.TestCase):
             with open(build_data_path('number_format_{0:02d}.qif'.format(file_number))) as fh:
                 try:
                     qif = QifParser.parse(fh, date_format='dmy')
-                except QifParserInvalidNumber, err:
+                except QifParserInvalidNumber as err:
                     raise QifParserInvalidNumber("%s in file %s" % (err, fh.name))
                 transaction = qif.get_transactions()[0][0]
                 self.assertEqual(transaction.amount, Decimal('-1234.56'))
 
     def testWriteFile(self):
-        data = open(filename).read()
-        qif = QifParser.parse(open(filename), date_format='dmy')
+        with open(filename) as fh:
+            data = fh.read()
+        with open(filename) as fh:
+            qif = QifParser.parse(fh, date_format='dmy')
 #        out = open('out.qif', 'w')
 #        out.write(str(qif))
 #        out.close()
-        self.assertEquals(data, str(qif))
+        self.assertEqual(data, str(qif))
 
     def testParseTransactionsFile(self):
-        data = open(filename3).read()
-        qif = QifParser.parse(open(filename3))
+        with open(filename3) as fh:
+            data = fh.read()
+        with open(filename3) as fh:
+            qif = QifParser.parse(fh)
 #        out = open('out.qif', 'w')
 #        out.write(str(qif))
 #        out.close()
-        self.assertEquals(data, str(qif))
+        self.assertEqual(data, str(qif))
 
     def testParseQifNumber(self):
         self.assertEqual(QifParser.parseQifNumber('1'), Decimal('1'))
