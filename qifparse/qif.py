@@ -28,6 +28,7 @@ class Qif(object):
         self._categories = []
         self._classes = []
         self._transactions = {}
+        self._transaction_headers = []
         self._last_header = None
 
     def add_account(self, item):
@@ -51,6 +52,7 @@ class Qif(object):
             raise RuntimeError(six.u("item not recognized"))
         if header and not header in self._transactions:
             self._transactions[header] = []
+            self._transaction_headers.append(header)
         if not header:
             header = self._last_header
         else:
@@ -117,7 +119,7 @@ class Qif(object):
             for cat in self._classes:
                 res.append(str(cat))
         if self._transactions:
-            for header in sorted(self._transactions.keys()):
+            for header in self._transaction_headers:
                 transactions = self._transactions[header]
                 res.append(header)
                 for tr in transactions:
