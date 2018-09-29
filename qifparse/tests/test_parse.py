@@ -128,6 +128,7 @@ class TestQIFParsing(unittest.TestCase):
         self.assertEqual(QifParser.parseQifNumber('1234', decimal_sep='.'), Decimal('1234'))
         self.assertEqual(QifParser.parseQifNumber('-1234.56', decimal_sep='.'), Decimal('-1234.56'))
         self.assertEqual(QifParser.parseQifNumber('-123,45', thousands_sep='.', decimal_sep=','), Decimal('-123.45'))
+        self.assertEqual(QifParser.parseQifNumber('-0.99', thousands_sep='', decimal_sep='.'), Decimal('-0.99'))
         self.assertRaises(QifParserException, QifParser.parseQifNumber, '-1234.56', decimal_sep=',')
 
 

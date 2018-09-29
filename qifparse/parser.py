@@ -495,7 +495,7 @@ please specify. (possible formats: %s""" % repr(possible_num_sep))
             int_p = int_p.replace(thousands_sep, '')
         else:
             try:
-                int_p = int(int_p)
+                int(int_p)
             except ValueError as err:
                 raise QifParserInvalidNumber("Invalid integer part: %s: %s" % (int_p, err))
 
